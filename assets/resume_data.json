@@ -1,0 +1,99 @@
+{
+  "personal_info": {
+    "name": "Your Name",
+    "email": "your.email@example.com",
+    "phone": "(123) 456-7890",
+    "location": "City, State",
+    "linkedin": "linkedin.com/in/yourprofile",
+    "github": "github.com/yourusername",
+    "portfolio": "yourportfolio.com"
+  },
+  "summary": "Experienced software developer with X years of experience in web development, focusing on building responsive and efficient applications. Proficient in multiple programming languages and frameworks with a strong background in full-stack development.",
+  "skills": {
+    "programming_languages": ["JavaScript", "Python", "Java", "C#", "SQL"],
+    "frameworks": [
+      "React",
+      "Node.js",
+      "Express",
+      "Django",
+      "Flask",
+      ".NET Core"
+    ],
+    "databases": ["MongoDB", "MySQL", "PostgreSQL", "SQLite"],
+    "tools": ["Git", "Docker", "AWS", "Azure", "CI/CD", "Webpack", "Jest"],
+    "soft_skills": [
+      "Team Collaboration",
+      "Problem Solving",
+      "Communication",
+      "Project Management",
+      "Agile Methodologies"
+    ]
+  },
+  "experience": [
+    {
+      "title": "Software Engineer",
+      "company": "Example Company",
+      "location": "City, State",
+      "dates": "January 2020 - Present",
+      "description": [
+        "Developed and maintained full-stack web applications using React and Node.js",
+        "Improved application performance by 40% through code optimization and caching strategies",
+        "Collaborated with cross-functional teams to deliver features on schedule",
+        "Implemented automated testing frameworks reducing bug rate by 25%"
+      ]
+    },
+    {
+      "title": "Junior Developer",
+      "company": "Previous Company",
+      "location": "City, State",
+      "dates": "June 2018 - December 2019",
+      "description": [
+        "Built responsive interfaces using HTML, CSS, and JavaScript",
+        "Participated in code reviews and implemented feedback from senior developers",
+        "Assisted in database design and optimization",
+        "Developed internal tools to improve team workflow"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Bachelor of Science in Computer Science",
+      "institution": "University Name",
+      "location": "City, State",
+      "dates": "2014 - 2018",
+      "highlights": [
+        "Graduated with Honors",
+        "GPA: 3.8/4.0",
+        "Relevant coursework: Data Structures, Algorithms, Web Development"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "E-commerce Platform",
+      "dates": "2019",
+      "description": "Developed a full-stack e-commerce platform with user authentication, product catalog, and payment processing",
+      "technologies": ["React", "Node.js", "MongoDB", "Stripe API"],
+      "url": "github.com/yourusername/ecommerce"
+    },
+    {
+      "name": "Task Management App",
+      "dates": "2018",
+      "description": "Created a responsive task management application with real-time updates and user collaboration features",
+      "technologies": ["JavaScript", "Firebase", "Bootstrap"],
+      "url": "github.com/yourusername/taskapp"
+    }
+  ],
+  "certifications": [
+    {
+      "name": "AWS Certified Developer",
+      "issuer": "Amazon Web Services",
+      "date": "2021"
+    },
+    {
+      "name": "Microsoft Certified: Azure Developer Associate",
+      "issuer": "Microsoft",
+      "date": "2020"
+    }
+  ]
+}

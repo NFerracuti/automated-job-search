@@ -1,0 +1,56 @@
+{
+  "job_search": {
+    "keywords": [
+      "developer",
+      "full stack developer",
+      "front-end developer",
+      "backend developer",
+      "software engineer"
+    ],
+    "locations": ["remote", "remote hybrid"],
+    "min_salary": 70000,
+    "excluded_keywords": ["senior", "principal", "10+ years"],
+    "job_boards": {
+      "linkedin": true,
+      "indeed": false,
+      "glassdoor": true,
+      "monster": false,
+      "ziprecruiter": true
+    },
+    "max_results_per_board": 30,
+    "scrape_frequency_hours": 24
+  },
+  "resume": {
+    "template_path": "assets/resume_template.docx",
+    "skills_section": true,
+    "experience_section": true,
+    "education_section": true,
+    "projects_section": true,
+    "max_pages": 2
+  },
+  "google_sheets": {
+    "spreadsheet_name": "Job Application Tracker",
+    "sheets": {
+      "jobs": {
+        "columns": [
+          "Job Title",
+          "Company",
+          "Location",
+          "Job Type",
+          "Salary Range",
+          "Job URL",
+          "Application Status",
+          "Custom Resume URL",
+          "Hiring Manager",
+          "Contact Email",
+          "Date Added"
+        ]
+      }
+    }
+  },
+  "openai": {
+    "model": "gpt-4",
+    "temperature": 0.2,
+    "max_tokens": 1000
+  }
+}

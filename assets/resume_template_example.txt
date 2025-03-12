@@ -1,0 +1,79 @@
+RESUME TEMPLATE GUIDE
+
+This file explains how to create a Word template (.docx) for use with this system.
+You'll need to create a template with merge fields that match the structure in resume_data.json.
+
+Steps to create a template:
+1. Open Microsoft Word and create a new document
+2. Design your resume layout with proper formatting, fonts, margins, etc.
+3. Instead of static text, add merge fields where dynamic content should go
+
+MERGE FIELD NAMING CONVENTION:
+Use these exact names for the merge fields to match the resume_data.json structure:
+
+Personal Information:
+- {{ personal_info.name }}
+- {{ personal_info.email }}
+- {{ personal_info.phone }}
+- {{ personal_info.location }}
+- {{ personal_info.linkedin }}
+- {{ personal_info.github }}
+- {{ personal_info.portfolio }}
+
+Summary:
+- {{ summary }}
+
+Skills:
+- {{ skills_text }} (This is a comma-separated list of all skills)
+
+Experience (use in a loop/table):
+For each position:
+- {{ experience[0].title }}
+- {{ experience[0].company }}
+- {{ experience[0].location }}
+- {{ experience[0].dates }}
+- {{ experience[0].description[0] }} (First bullet point)
+- {{ experience[0].description[1] }} (Second bullet point)
+- etc.
+
+For the second position, use experience[1], and so on.
+
+Education (use in a loop/table):
+For each entry:
+- {{ education[0].degree }}
+- {{ education[0].institution }}
+- {{ education[0].location }}
+- {{ education[0].dates }}
+- {{ education[0].highlights[0] }} (First highlight)
+- {{ education[0].highlights[1] }} (Second highlight)
+- etc.
+
+Projects (use in a loop/table):
+For each project:
+- {{ projects[0].name }}
+- {{ projects[0].dates }}
+- {{ projects[0].description }}
+- {{ projects[0].technologies }} (This can be joined as a text)
+- {{ projects[0].url }}
+
+Certifications (use in a loop/table):
+For each certification:
+- {{ certifications[0].name }}
+- {{ certifications[0].issuer }}
+- {{ certifications[0].date }}
+
+ADVANCED USAGE:
+For more advanced template construction, you can use docxtpl's conditionals, loops, and other features.
+See: https://docxtpl.readthedocs.io/en/latest/
+
+EXAMPLE:
+{% for job in experience %}
+{{ job.title }} at {{ job.company }}
+{{ job.location }} | {{ job.dates }}
+{% for bullet in job.description %}
+• {{ bullet }}
+{% endfor %}
+{% endfor %}
+
+SAVE YOUR TEMPLATE:
+Save your template as a .docx file in the assets folder as "resume_template.docx"
