@@ -3,6 +3,7 @@
 *.pem
 *credentials*.json
 google-credentials.json
+google-service-account.json
 *private*.json
 *secret*.json
 
