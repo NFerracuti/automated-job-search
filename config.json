@@ -30,6 +30,7 @@
   },
   "google_sheets": {
     "spreadsheet_name": "Job Application Tracker",
+    "spreadsheet_id": "1_aXWVQ_JrnjCnWnNus_2aYpD_-zxjm5B8LpsQn7UIHk",
     "sheets": {
       "jobs": {
         "columns": [
