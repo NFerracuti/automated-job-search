@@ -108,36 +108,65 @@ class OpenAIResumeGenerator:
         try:
             # Prepare skills by category
             skills_by_category = []
+            standalone_skills = []
+            
+            # Separate standalone skills (Git and Scrum) from categorized skills
             for category, skills in self.resume_data["skills"].items():
-                category_name = category.replace('_', ' ').title()
-                skills_text = ', '.join(skills)
-                skills_by_category.append(f"{category_name}: {skills_text}")
+                if category.lower() in ['git', 'scrum']:
+                    standalone_skills.extend(skills)
+                else:
+                    category_name = category.replace('_', ' ').title()
+                    skills_text = ', '.join(skills)
+                    skills_by_category.append(f"{category_name}:\n{skills_text}")
             
             prompt = f"""
             Job Description:
             {job_description}
             
-            My Skills by Category:
-            {'\n'.join(skills_by_category)}
+            My Current Skills Structure:
+            {'\n\n'.join(skills_by_category)}
+            
+            Standalone Skills:
+            {', '.join(standalone_skills)}
             
             As an AI assistant specializing in resume optimization:
-            1. Analyze the job description for required and preferred technical skills
-            2. From my skill set, identify:
-               - Direct matches with job requirements
-               - Related skills that demonstrate relevant capabilities
-               - Transferable skills that add value to the role
-            3. Order the skills by:
-               - Priority in the job description
-               - Relevance to the role
-               - Keyword optimization for ATS
+            1. IMPORTANT: DO NOT REMOVE ANY EXISTING SKILLS
+            2. Analyze the job description for additional required technical skills that are not in my current skill set
+            3. Add only the missing skills that are explicitly mentioned in the job description
+            4. Place new skills in their appropriate categories, maintaining the existing structure
+            5. Keep Git and Scrum as standalone skills (not in categories)
             
-            Return ONLY a comma-separated list of the most relevant skills, with exact keyword matches first.
+            Return the skills in this EXACT format (including newlines):
+            Programming Languages:
+            [skills list]
+            
+            Git
+            
+            Databases:
+            [skills list]
+            
+            Frameworks, libraries, environments:
+            [skills list]
+            
+            Testing Frameworks:
+            [skills list]
+            
+            Software:
+            [skills list]
+            
+            Scrum
+            
+            IMPORTANT: 
+            - Maintain all existing skills in each category
+            - Only add new skills that are explicitly mentioned in the job description
+            - Keep the exact category names and format
+            - Keep Git and Scrum as standalone entries
             """
             
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=self.temperature,
+                temperature=0.7,
                 max_tokens=self.max_tokens
             )
             
@@ -147,7 +176,20 @@ class OpenAIResumeGenerator:
             
         except Exception as e:
             logger.error(f"Error generating skills section: {str(e)}")
-            return ", ".join([skill for skills in self.resume_data["skills"].values() for skill in skills])
+            # Return original skills structure as fallback
+            return self._format_original_skills()
+    
+    def _format_original_skills(self):
+        """Format original skills in the desired structure as a fallback"""
+        formatted_skills = []
+        for category, skills in self.resume_data["skills"].items():
+            if category.lower() in ['git', 'scrum']:
+                formatted_skills.append(category.title())
+            else:
+                category_name = category.replace('_', ' ').title()
+                skills_text = ', '.join(skills)
+                formatted_skills.append(f"{category_name}:\n{skills_text}")
+        return '\n\n'.join(formatted_skills)
     
     def _generate_experience_bullets(self, job_description, experience_item):
         """Generate tailored experience bullet points for a specific role"""

@@ -145,6 +145,11 @@ class DocxResumeGenerator:
         left_cell = table.rows[0].cells[0]
         right_cell = table.rows[0].cells[1]
         
+        # Remove any default paragraph in right cell
+        if right_cell.paragraphs:
+            p = right_cell.paragraphs[0]._element
+            p.getparent().remove(p)
+        
         # Add vertical line between columns
         table.style = 'Table Grid'
         # Remove all borders except the vertical line between columns
@@ -166,12 +171,14 @@ class DocxResumeGenerator:
         styles = doc.styles
         style = styles['Normal']
         style.font.name = font_name
+        style.font.size = Pt(10)  # Set base font size to 10pt
         
         # Function to create highlighted section header
-        def add_section_header(cell, text):
-            # Add blank line before header
-            spacer_before = cell.add_paragraph()
-            spacer_before.paragraph_format.space_after = Pt(0)
+        def add_section_header(cell, text, add_space_before=True):
+            # Add blank line before header (optional)
+            if add_space_before:
+                spacer_before = cell.add_paragraph()
+                spacer_before.paragraph_format.space_after = Pt(0)
             
             # Add header with grey background
             header = cell.add_paragraph()
@@ -198,31 +205,71 @@ class DocxResumeGenerator:
         run = name_paragraph.add_run("Nick Ferracuti")
         run.bold = True
         run.font.size = Pt(18)
+        name_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
         # Title
         title_paragraph = left_cell.add_paragraph()
-        run = title_paragraph.add_run(personal.get("title", ""))
+        title_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = title_paragraph.add_run(personal.get("title", "Full Stack Developer"))
         run.bold = True
         
-        # Contact info with reduced spacing
-        contact_info = []
-        for info_key in ["email", "phone", "location"]:
-            if personal.get(info_key):
-                contact_info.append(personal[info_key])
+        # Contact info with hyperlinks
+        contact_paragraph = left_cell.add_paragraph()
+        contact_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        contact_paragraph.paragraph_format.space_after = Pt(0)
+        contact_paragraph.paragraph_format.space_before = Pt(0)
         
-        # Links (including portfolio)
-        for link_type in ["portfolio", "linkedin", "github"]:
-            if link_type == "portfolio":
-                contact_info.append("Portfolio: nickferracuti.com")
-            elif personal.get(link_type):
-                contact_info.append(f"{link_type.title()}: {personal[link_type]}")
+        # Website with hyperlink
+        website_run = contact_paragraph.add_run()
+        website_run.text = "www.nickferracuti.com"
+        website_run.font.color.rgb = RGBColor(0, 0, 255)  # Blue color for hyperlink
+        website_run.font.underline = True
+        # Add hyperlink relationship
+        rel_id = doc.part.relate_to('http://www.nickferracuti.com', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink', is_external=True)
+        hyperlink = OxmlElement('w:hyperlink')
+        hyperlink.set(qn('r:id'), rel_id)
+        hyperlink.append(website_run._r)
+        contact_paragraph._p.append(hyperlink)
         
-        # Add all contact info in a single paragraph with line breaks
-        if contact_info:
-            contact_paragraph = left_cell.add_paragraph()
-            contact_paragraph.paragraph_format.space_after = Pt(0)
-            contact_paragraph.paragraph_format.space_before = Pt(0)
-            contact_paragraph.add_run("\n".join(contact_info))
+        # Add line break
+        contact_paragraph.add_run("\n")
+        
+        # Email and phone
+        contact_paragraph.add_run("npferracuti@gmail.com\n")
+        contact_paragraph.add_run("416-358-4749\n")
+        contact_paragraph.add_run("Toronto, Canada\n")
+        
+        # LinkedIn with hyperlink
+        linkedin_run = contact_paragraph.add_run()
+        linkedin_run.text = "Linkedin.com/in/nick-ferracuti/"
+        linkedin_run.font.color.rgb = RGBColor(0, 0, 255)  # Blue color for hyperlink
+        linkedin_run.font.underline = True
+        # Add hyperlink relationship
+        rel_id = doc.part.relate_to('https://www.linkedin.com/in/nick-ferracuti/', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink', is_external=True)
+        hyperlink = OxmlElement('w:hyperlink')
+        hyperlink.set(qn('r:id'), rel_id)
+        hyperlink.append(linkedin_run._r)
+        contact_paragraph._p.append(hyperlink)
+        
+        # Add line break
+        contact_paragraph.add_run("\n")
+        
+        # GitHub with hyperlink
+        github_run = contact_paragraph.add_run()
+        github_run.text = "Github.com/NFerracuti"
+        github_run.font.color.rgb = RGBColor(0, 0, 255)  # Blue color for hyperlink
+        github_run.font.underline = True
+        # Add hyperlink relationship
+        rel_id = doc.part.relate_to('https://github.com/NFerracuti', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink', is_external=True)
+        hyperlink = OxmlElement('w:hyperlink')
+        hyperlink.set(qn('r:id'), rel_id)
+        hyperlink.append(github_run._r)
+        contact_paragraph._p.append(hyperlink)
+        
+        # Add spacing after contact info
+        spacer = left_cell.add_paragraph()
+        spacer.paragraph_format.space_before = Pt(6)
+        spacer.paragraph_format.space_after = Pt(6)
         
         # Summary section
         if resume_data.get("summary"):
@@ -233,14 +280,53 @@ class DocxResumeGenerator:
         # Skills Section
         skills_header = add_section_header(left_cell, "SKILLS")
         
-        skills_data = resume_data.get("skills", {})
-        if isinstance(skills_data, dict):
+        skills_data = resume_data.get("skills", "")
+        if isinstance(skills_data, str) and skills_data.strip():
+            # Handle structured string format from OpenAI
+            sections = skills_data.split('\n\n')
+            for section in sections:
+                section = section.strip()
+                if section:
+                    if ':' in section:
+                        # Category with skills
+                        category, skills = section.split(':', 1)
+                        category_para = left_cell.add_paragraph()
+                        category_run = category_para.add_run(category.strip())
+                        category_run.bold = True
+                        category_run.font.size = Pt(10)  # Ensure category is 10pt
+                        
+                        skills_para = left_cell.add_paragraph()
+                        skills_run = skills_para.add_run(skills.strip())
+                        skills_run.font.size = Pt(10)  # Ensure skills are 10pt
+                        skills_para.paragraph_format.space_after = Pt(6)
+                    else:
+                        # Standalone skill (Git or Scrum)
+                        standalone_para = left_cell.add_paragraph()
+                        standalone_run = standalone_para.add_run(section.strip())
+                        standalone_run.bold = True
+                        standalone_run.font.size = Pt(10)  # Ensure standalone skills are 10pt
+                        standalone_para.paragraph_format.space_after = Pt(6)
+        elif isinstance(skills_data, dict):
+            # Handle dictionary format from resume_data.json
+            # First add categorized skills
             for category, skills in skills_data.items():
-                if skills:
-                    category_paragraph = left_cell.add_paragraph()
-                    category_paragraph.add_run(f"{category.replace('_', ' ').title()}").bold = True
-                    skills_paragraph = left_cell.add_paragraph()
-                    skills_paragraph.add_run(", ".join(skills))
+                if category.lower() not in ['git', 'scrum']:
+                    if skills:
+                        category_para = left_cell.add_paragraph()
+                        category_para.add_run(category.replace('_', ' ').title()).bold = True
+                        skills_para = left_cell.add_paragraph()
+                        skills_para.add_run(', '.join(skills))
+                        skills_para.paragraph_format.space_after = Pt(6)
+            
+            # Then add standalone skills
+            for category in ['git', 'scrum']:
+                if category in skills_data and skills_data[category]:
+                    standalone_para = left_cell.add_paragraph()
+                    standalone_para.add_run(category.title()).bold = True
+                    standalone_para.paragraph_format.space_after = Pt(6)
+        else:
+            # Log warning if no skills found
+            self.logger.warning("No skills data found or in unexpected format")
         
         # Education Section
         if resume_data.get("education"):
@@ -275,7 +361,21 @@ class DocxResumeGenerator:
         
         # Experience section
         if resume_data.get("experience"):
-            exp_header = add_section_header(right_cell, "PROFESSIONAL EXPERIENCE")
+            # Create header paragraph directly
+            header = right_cell.add_paragraph()
+            header.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = header.add_run("PROFESSIONAL EXPERIENCE")
+            run.bold = True
+            # Add light grey background
+            pPr = header._p.get_or_add_pPr()
+            pPr.append(parse_xml(f'<w:shd {nsdecls("w")} w:fill="F2F2F2"/>'))
+            header.paragraph_format.space_before = Pt(0)
+            header.paragraph_format.space_after = Pt(0)
+            
+            # Add white spacing below header only
+            spacer_after = right_cell.add_paragraph()
+            spacer_after.paragraph_format.space_before = Pt(0)
+            spacer_after.paragraph_format.space_after = Pt(0)
             
             for exp in resume_data["experience"]:
                 # Company and title
@@ -304,7 +404,8 @@ class DocxResumeGenerator:
                     if isinstance(description_points, list):
                         for point in description_points:
                             bullet_para = right_cell.add_paragraph(style='List Bullet')
-                            bullet_para.add_run(point)
+                            bullet_run = bullet_para.add_run(point)
+                            bullet_run.font.size = Pt(10)  # Set description points to 10pt
                             bullet_para.paragraph_format.space_after = Pt(0)
                             bullet_para.paragraph_format.space_before = Pt(0)
                 
@@ -324,7 +425,7 @@ class DocxResumeGenerator:
             sections = doc.sections
             for section in sections:
                 section.top_margin = Inches(0.5)
-                section.bottom_margin = Inches(0.5)
+                section.bottom_margin = Inches(0.3)
                 section.left_margin = Inches(0.5)
                 section.right_margin = Inches(0.5)
             
@@ -555,50 +656,120 @@ class DocxResumeGenerator:
                 p.paragraph_format.space_before = Pt(0)
                 p.paragraph_format.space_after = Pt(6)
 
+    def _add_personal_info_section(self, cell, personal_info):
+        """Add personal information section with hardcoded access to resume data"""
+        # Load resume data if not already loaded
+        if not hasattr(self, 'resume_data'):
+            try:
+                with open('assets/resume_data.json', 'r') as f:
+                    self.resume_data = json.load(f)
+            except Exception as e:
+                self.logger.error(f"Error loading resume data: {str(e)}")
+                self.resume_data = {}
+        
+        # Extract name - prioritize personal_info from resume_data
+        name = ""
+        if 'personal_info' in self.resume_data and 'name' in self.resume_data['personal_info']:
+            name = self.resume_data['personal_info']['name']
+        elif isinstance(personal_info, dict) and 'name' in personal_info:
+            name = personal_info['name']
+        
+        # Add name paragraph
+        p = cell.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        name_run = p.add_run(name)
+        name_run.bold = True
+        name_run.font.size = Pt(14)
+        name_run.font.name = "Zilla Slab Medium"
+        
+        # Extract contact details - prioritize personal_info from resume_data
+        email = ""
+        phone = ""
+        location = ""
+        
+        if 'personal_info' in self.resume_data:
+            email = self.resume_data['personal_info'].get('email', '')
+            phone = self.resume_data['personal_info'].get('phone', '')
+            location = self.resume_data['personal_info'].get('location', '')
+        elif isinstance(personal_info, dict):
+            email = personal_info.get('email', '')
+            phone = personal_info.get('phone', '')
+            location = personal_info.get('location', '')
+        
+        # Add contact paragraph
+        p = cell.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_before = Pt(2)
+        p.paragraph_format.space_after = Pt(0)
+        
+        contact_run = p.add_run(f"{email} | {phone} | {location}")
+        contact_run.font.size = Pt(10)
+        contact_run.font.name = "Zilla Slab Medium"
+        
+        # Add a spacer after the personal info
+        p = cell.add_paragraph()
+        p.paragraph_format.space_before = Pt(2)
+        p.paragraph_format.space_after = Pt(2)
+
     def _add_skills_section(self, cell, skills):
-        """Add skills section with guaranteed visibility"""
-        self.logger.info(f"Adding skills section with value: '{skills}'")
+        """Add skills section with hardcoded access to resume data"""
+        self._add_section_header(cell, "SKILLS")
         
-        # Add section header
-        self.add_section_header(cell, "SKILLS")
+        # Load resume data if not already loaded
+        if not hasattr(self, 'resume_data'):
+            try:
+                with open('assets/resume_data.json', 'r') as f:
+                    self.resume_data = json.load(f)
+                    self.logger.info(f"Loaded resume data for skills section")
+            except Exception as e:
+                self.logger.error(f"Error loading resume data: {str(e)}")
+                self.resume_data = {}
         
-        # Debug the input
-        if isinstance(skills, dict):
-            # Handle the case where skills is a nested dictionary
-            all_skills = []
-            for category, skill_list in skills.items():
-                if isinstance(skill_list, list):
-                    all_skills.extend(skill_list)
-            skills_text = ", ".join(all_skills)
-            self.logger.info(f"Converted skills dict to: '{skills_text}'")
-        elif isinstance(skills, list):
+        # First try to use the skills parameter
+        skills_text = ""
+        
+        # If skills is a valid input, use it
+        if isinstance(skills, list):
             skills_text = ", ".join(skills)
-            self.logger.info(f"Converted skills list to: '{skills_text}'")
-        elif isinstance(skills, str):
+            self.logger.info(f"Using skills list from parameter: {skills_text[:50]}...")
+        elif isinstance(skills, str) and skills.strip():
             skills_text = skills
-            self.logger.info(f"Using skills as string: '{skills_text}'")
+            self.logger.info(f"Using skills string from parameter: {skills_text[:50]}...")
+        # If not, extract from resume_data.json
         else:
-            # Fallback
-            skills_text = "Python, JavaScript, HTML, CSS, React, Node.js"
-            self.logger.warning(f"Unexpected skills type: {type(skills)}, using fallback: '{skills_text}'")
+            try:
+                # Check if skills is a nested dictionary in resume_data
+                if 'skills' in self.resume_data and isinstance(self.resume_data['skills'], dict):
+                    all_skills = []
+                    for category, skill_list in self.resume_data['skills'].items():
+                        if isinstance(skill_list, list):
+                            all_skills.extend(skill_list)
+                    
+                    skills_text = ", ".join(all_skills)
+                    self.logger.info(f"Extracted skills from resume_data dictionary: {skills_text[:50]}...")
+                # Check if skills is a direct list in resume_data
+                elif 'skills' in self.resume_data and isinstance(self.resume_data['skills'], list):
+                    skills_text = ", ".join(self.resume_data['skills'])
+                    self.logger.info(f"Extracted skills from resume_data list: {skills_text[:50]}...")
+            except Exception as e:
+                self.logger.error(f"Error extracting skills from resume_data: {str(e)}")
         
-        # Fallback if empty
+        # Fallback if still no skills
         if not skills_text or skills_text.strip() == "":
             skills_text = "Python, JavaScript, HTML, CSS, React, Node.js"
-            self.logger.warning(f"Empty skills, using fallback: '{skills_text}'")
+            self.logger.warning(f"No skills found, using default: {skills_text}")
         
-        # Add paragraph with explicit styling
+        # Add the skills paragraph
         p = cell.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        p.paragraph_format.space_before = Pt(6)
-        p.paragraph_format.space_after = Pt(6)
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(0)
         
-        # Add the text with explicit styling
         run = p.add_run(skills_text)
         run.font.size = Pt(10)
-        run.font.name = "Zilla Slab Medium"
         
-        self.logger.info(f"Skills added successfully with text: '{skills_text}'")
+        self.logger.info(f"Added skills to document: {skills_text[:50]}...")
 
     def generate_resume_file(self, tailored_resume):
         """Bridge method to match what main.py is expecting"""

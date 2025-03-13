@@ -211,14 +211,65 @@ def setup():
     
     print("\nSetup complete! Edit your config.json file to customize job search parameters.")
 
+def load_resume_data():
+    """Load resume data from the specified file"""
+    resume_data_path = os.getenv('RESUME_DATA_PATH', 'assets/resume_data.json')
+    try:
+        with open(resume_data_path, 'r') as f:
+            data = json.load(f)
+        logger.info(f"Resume data loaded from {resume_data_path}")
+        
+        # Log personal details
+        if 'personal_info' in data:
+            logger.info(f"Personal info found: Name = {data['personal_info'].get('name', 'NOT FOUND')}")
+        else:
+            logger.warning("No personal_info section found in resume_data")
+        
+        # Log skills
+        if 'skills' in data:
+            if isinstance(data['skills'], dict):
+                skill_categories = list(data['skills'].keys())
+                sample_skills = []
+                for category in list(data['skills'].keys())[:2]:  # Log first two categories
+                    if isinstance(data['skills'][category], list):
+                        sample_skills.extend(data['skills'][category][:3])  # First three skills
+                logger.info(f"Skills found as dictionary with categories: {skill_categories}")
+                logger.info(f"Sample skills: {sample_skills}")
+            elif isinstance(data['skills'], list):
+                logger.info(f"Skills found as list: {data['skills'][:5]}...")  # First five skills
+            elif isinstance(data['skills'], str):
+                logger.info(f"Skills found as string: {data['skills'][:50]}...")  # First 50 chars
+            else:
+                logger.warning(f"Skills found but in unexpected format: {type(data['skills'])}")
+        else:
+            logger.warning("No skills section found in resume_data")
+            
+        return data
+    except Exception as e:
+        logger.error(f"Error loading resume data: {str(e)}")
+        return {}
+
 def process_job_application(job_data):
     """Process a single job application"""
     try:
+        # Load resume data first
+        resume_data = load_resume_data()
+        
         logger.info(f"Processing job application for: {job_data['title']} at {job_data['company']}")
         
         # 1. Generate tailored resume content using OpenAI
         logger.info("Generating tailored resume content...")
-        openai_generator = OpenAIResumeGenerator()
+        resume_data_path = os.getenv('RESUME_DATA_PATH', 'assets/resume_data.json')
+        openai_generator = OpenAIResumeGenerator(resume_data_path)
+        
+        # Log before calling OpenAI
+        if 'skills' in resume_data:
+            if isinstance(resume_data['skills'], dict):
+                logger.info(f"Skills being sent to OpenAI: dictionary with {len(resume_data['skills'])} categories")
+            else:
+                logger.info(f"Skills being sent to OpenAI: {str(resume_data['skills'])[:50]}...")
+        else:
+            logger.warning("No skills being sent to OpenAI")
         
         # Combine job title, description, and requirements for better context
         full_job_description = f"""
@@ -236,6 +287,13 @@ def process_job_application(job_data):
         
         tailored_resume = openai_generator.generate_tailored_resume(full_job_description)
         
+        # Log after receiving OpenAI response
+        logger.info(f"Tailored resume received from OpenAI with keys: {tailored_resume.keys()}")
+        if 'skills' in tailored_resume:
+            logger.info(f"Skills returned from OpenAI: {tailored_resume['skills'][:100]}...")
+        else:
+            logger.warning("No skills returned from OpenAI")
+        
         # Add metadata about the job
         tailored_resume["metadata"] = {
             "job_title": job_data["title"],
@@ -249,6 +307,13 @@ def process_job_application(job_data):
         # 2. Generate Word document
         logger.info("Generating Word document...")
         doc_generator = DocxResumeGenerator()
+        
+        # Log before passing to document generator
+        logger.info(f"Data being passed to document generator:")
+        logger.info(f"  - Summary: {tailored_resume.get('summary', '')[:50]}...")
+        logger.info(f"  - Skills: {tailored_resume.get('skills', '')[:100]}...")
+        
+        # Generate resume file
         doc_path = doc_generator.generate_resume_file(tailored_resume)
         
         if not doc_path:
@@ -325,33 +390,57 @@ def main():
             logger.warning("No jobs found matching the criteria")
             return
         
-        # Process the first job as a test
-        first_job = jobs[0]
-        logger.info(f"Selected job: {first_job['title']} at {first_job['company']}")
+        # Filter out senior roles
+        filtered_jobs = [
+            job for job in jobs 
+            if not any(term.lower() in job['title'].lower() 
+                      for term in ['senior', 'sr.', 'lead', 'principal', 'architect'])
+        ]
         
-        # Process the job application
-        processed_job = process_job_application(first_job)
+        logger.info(f"Found {len(filtered_jobs)} jobs after filtering senior roles")
         
-        # Save the processed job data
-        output_dir = "processed_jobs"
-        os.makedirs(output_dir, exist_ok=True)
-        output_path = os.path.join(output_dir, f"job_{processed_job.get('id', 'unknown')}.json")
+        # Process up to 3 jobs
+        jobs_to_process = filtered_jobs[:3]
+        logger.info(f"Processing {len(jobs_to_process)} jobs")
         
-        with open(output_path, 'w') as f:
-            json.dump(processed_job, f, indent=2)
+        processed_jobs = []
+        for job in jobs_to_process:
+            try:
+                logger.info(f"Processing job: {job['title']} at {job['company']}")
+                processed_job = process_job_application(job)
+                processed_jobs.append(processed_job)
+                
+                # Save the processed job data
+                output_dir = "processed_jobs"
+                os.makedirs(output_dir, exist_ok=True)
+                output_path = os.path.join(output_dir, f"job_{processed_job.get('id', 'unknown')}.json")
+                
+                with open(output_path, 'w') as f:
+                    json.dump(processed_job, f, indent=2)
+                
+                logger.info(f"Job processing complete. Results saved to: {output_path}")
+                
+                # Add a delay between processing jobs to avoid rate limits
+                time.sleep(5)
+                
+            except Exception as e:
+                logger.error(f"Error processing job {job['title']}: {str(e)}")
+                continue
         
-        logger.info(f"Job processing complete. Results saved to: {output_path}")
-        
-        # Print summary
+        # Print summary of all processed jobs
         print("\n=== Job Application Summary ===")
-        print(f"Job Title: {processed_job['title']}")
-        print(f"Company: {processed_job['company']}")
-        print(f"Location: {processed_job['location']}")
-        print(f"Job URL: {processed_job.get('redirect_url', processed_job.get('url', 'Not available'))}")
-        print(f"Resume Drive URL: {processed_job['resume_drive_url']}")
-        print(f"Application Date: {processed_job['application_date']}")
-        print(f"Status: {processed_job['status']}")
-        print(f"Google Sheets Status: {processed_job.get('sheets_status', 'Not added')}")
+        for job in processed_jobs:
+            print(f"\nJob: {job['title']}")
+            print(f"Company: {job['company']}")
+            print(f"Location: {job['location']}")
+            print(f"Job URL: {job.get('redirect_url', job.get('url', 'Not available'))}")
+            print(f"Resume Drive URL: {job['resume_drive_url']}")
+            print(f"Application Date: {job['application_date']}")
+            print(f"Status: {job['status']}")
+            print(f"Google Sheets Status: {job.get('sheets_status', 'Not added')}")
+            print("-" * 50)
+        
+        logger.info(f"Successfully processed {len(processed_jobs)} jobs")
         
     except Exception as e:
         logger.error(f"Error in main process: {str(e)}")
