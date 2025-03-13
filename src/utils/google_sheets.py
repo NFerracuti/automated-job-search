@@ -15,86 +15,71 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger('GoogleSheets')
+logger = logging.getLogger('GoogleSheetsManager')
 
 class GoogleSheetsManager:
     """Class to manage Google Sheets operations for job applications"""
     
     def __init__(self, config_path='config.json'):
-        """Initialize with config from file"""
-        # Load config
-        with open(config_path, 'r') as f:
-            self.config = json.load(f)
-        
-        self.logger = logging.getLogger(self.__class__.__name__)
-        
-        # Set up credentials
-        creds_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-        if not creds_path:
-            raise ValueError("GOOGLE_APPLICATION_CREDENTIALS not set in .env file")
-        
+        """Initialize the Google Sheets manager"""
         try:
-            self.credentials = service_account.Credentials.from_service_account_file(
-                creds_path, 
-                scopes=['https://www.googleapis.com/auth/spreadsheets']
+            # Load config
+            with open(config_path, 'r') as f:
+                self.config = json.load(f)
+            
+            # Set up Google Sheets API client
+            creds_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+            if not creds_path:
+                raise ValueError("GOOGLE_APPLICATION_CREDENTIALS not set in .env file")
+            
+            credentials = service_account.Credentials.from_service_account_file(
+                creds_path,
+                scopes=['https://www.googleapis.com/auth/spreadsheets',
+                       'https://www.googleapis.com/auth/drive']
             )
             
-            # Create service client
-            self.service = build('sheets', 'v4', credentials=self.credentials)
+            self.service = build('sheets', 'v4', credentials=credentials)
+            self.drive_service = build('drive', 'v3', credentials=credentials)
             
-            # Get spreadsheet ID from config
-            self.spreadsheet_id = self.config["google_sheets"]["spreadsheet_id"]
+            # Get or create spreadsheet
+            self.spreadsheet_id = self.config["google_sheets"].get("spreadsheet_id")
+            if not self.spreadsheet_id:
+                self.create_job_tracker_spreadsheet()
             
-            # Initialize the sheet if needed
-            self._init_sheet()
+            logger.info("Google Sheets Manager initialized successfully")
             
         except Exception as e:
-            self.logger.error(f"Error initializing Google Sheets Manager: {str(e)}")
+            logger.error(f"Error initializing Google Sheets Manager: {str(e)}")
             raise
     
-    def _init_sheet(self):
-        """Initialize the sheet with headers if needed"""
+    def create_job_tracker_spreadsheet(self):
+        """Create a new job tracker spreadsheet"""
         try:
-            # Get the sheet metadata first
-            sheet_metadata = self.service.spreadsheets().get(
-                spreadsheetId=self.spreadsheet_id
-            ).execute()
-            
-            # Check if "Jobs" sheet exists
-            sheets = sheet_metadata.get('sheets', [])
-            jobs_sheet = None
-            for sheet in sheets:
-                if sheet['properties']['title'] == 'Jobs':
-                    jobs_sheet = sheet
-                    break
-            
-            if not jobs_sheet:
-                # Create new "Jobs" sheet with default formatting
-                self.logger.info("Creating new 'Jobs' sheet...")
-                result = self.service.spreadsheets().batchUpdate(
-                    spreadsheetId=self.spreadsheet_id,
-                    body={
-                        "requests": [{
-                            "addSheet": {
-                                "properties": {
-                                    "title": "Jobs",
-                                    "gridProperties": {
-                                        "rowCount": 1000,
-                                        "columnCount": 15
-                                    }
-                                }
-                            }
-                        }]
+            # Create new spreadsheet
+            spreadsheet = {
+                'properties': {
+                    'title': self.config["google_sheets"]["spreadsheet_name"]
+                },
+                'sheets': [{
+                    'properties': {
+                        'title': 'Jobs',
+                        'gridProperties': {
+                            'frozenRowCount': 1
+                        }
                     }
-                ).execute()
-                
-                # Get the new sheet's ID
-                jobs_sheet = result['replies'][0]['addSheet']
+                }]
+            }
             
-            # Set up headers
+            sheet = self.service.spreadsheets().create(body=spreadsheet).execute()
+            self.spreadsheet_id = sheet['spreadsheetId']
+            
+            # Update config with new spreadsheet ID
+            self.config["google_sheets"]["spreadsheet_id"] = self.spreadsheet_id
+            with open('config.json', 'w') as f:
+                json.dump(self.config, f, indent=2)
+            
+            # Set up header row
             headers = self.config["google_sheets"]["sheets"]["jobs"]["columns"]
-            
-            # Update headers
             self.service.spreadsheets().values().update(
                 spreadsheetId=self.spreadsheet_id,
                 range='Jobs!A1',
@@ -104,34 +89,39 @@ class GoogleSheetsManager:
                 }
             ).execute()
             
-            # Only make headers bold, keep everything else default
+            # Format header row
+            requests = [{
+                'repeatCell': {
+                    'range': {
+                        'sheetId': 0,
+                        'startRowIndex': 0,
+                        'endRowIndex': 1
+                    },
+                    'cell': {
+                        'userEnteredFormat': {
+                            'backgroundColor': {
+                                'red': 0.8,
+                                'green': 0.8,
+                                'blue': 0.8
+                            },
+                            'textFormat': {
+                                'bold': True
+                            }
+                        }
+                    },
+                    'fields': 'userEnteredFormat(backgroundColor,textFormat)'
+                }
+            }]
+            
             self.service.spreadsheets().batchUpdate(
                 spreadsheetId=self.spreadsheet_id,
-                body={
-                    "requests": [{
-                        "repeatCell": {
-                            "range": {
-                                "sheetId": jobs_sheet['properties']['sheetId'],
-                                "startRowIndex": 0,
-                                "endRowIndex": 1
-                            },
-                            "cell": {
-                                "userEnteredFormat": {
-                                    "textFormat": {
-                                        "bold": True
-                                    }
-                                }
-                            },
-                            "fields": "userEnteredFormat.textFormat.bold"
-                        }
-                    }]
-                }
+                body={'requests': requests}
             ).execute()
             
-            self.logger.info("Sheet initialized successfully!")
+            logger.info(f"Created new job tracker spreadsheet with ID: {self.spreadsheet_id}")
             
         except Exception as e:
-            self.logger.error(f"Error initializing sheet: {str(e)}")
+            logger.error(f"Error creating job tracker spreadsheet: {str(e)}")
             raise
     
     def add_jobs(self, jobs):
@@ -152,36 +142,15 @@ class GoogleSheetsManager:
             
             for job in jobs:
                 # Skip if job URL is already in spreadsheet
-                if job.get('url', '') in current_urls:
-                    self.logger.info(f"Skipping duplicate job: {job.get('title')} at {job.get('company')}")
+                job_url = job.get('Job URL', '')
+                if job_url in current_urls:
+                    logger.info(f"Skipping duplicate job: {job.get('Job Title')} at {job.get('Company')}")
                     continue
                 
+                # Create row with columns in correct order
                 row = []
                 for column in columns:
-                    if column == "Job Title":
-                        row.append(job.get('title', ''))
-                    elif column == "Company":
-                        row.append(job.get('company', ''))
-                    elif column == "Location":
-                        row.append(job.get('location', ''))
-                    elif column == "Job Type":
-                        row.append(job.get('job_type', ''))
-                    elif column == "Salary Range":
-                        row.append(job.get('salary_text', ''))
-                    elif column == "Job URL":
-                        row.append(job.get('url', ''))
-                    elif column == "Application Status":
-                        row.append("Not Started")
-                    elif column == "Custom Resume URL":
-                        row.append('')
-                    elif column == "Hiring Manager":
-                        row.append(job.get('hiring_manager', ''))
-                    elif column == "Contact Email":
-                        row.append(job.get('contact_email', ''))
-                    elif column == "Date Added":
-                        row.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                    else:
-                        row.append('')
+                    row.append(str(job.get(column, '')))
                 
                 rows_to_add.append(row)
                 added_jobs.append(job)
@@ -197,14 +166,14 @@ class GoogleSheetsManager:
                     }
                 ).execute()
                 
-                self.logger.info(f"Added {len(rows_to_add)} jobs to spreadsheet")
+                logger.info(f"Added {len(rows_to_add)} jobs to spreadsheet")
                 return added_jobs
             else:
-                self.logger.info("No new jobs to add to spreadsheet")
+                logger.info("No new jobs to add to spreadsheet")
                 return []
                 
         except Exception as e:
-            self.logger.error(f"Error adding jobs to spreadsheet: {str(e)}")
+            logger.error(f"Error adding jobs to spreadsheet: {str(e)}")
             return []
     
     def get_all_jobs(self):
@@ -232,7 +201,7 @@ class GoogleSheetsManager:
             return jobs
             
         except Exception as e:
-            self.logger.error(f"Error getting jobs from spreadsheet: {str(e)}")
+            logger.error(f"Error getting jobs from spreadsheet: {str(e)}")
             return []
     
     def update_job(self, job_url, updates):

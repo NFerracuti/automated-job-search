@@ -1,21 +1,18 @@
 {
   "job_search": {
     "keywords": [
-      "developer",
+      "python developer",
       "full stack developer",
-      "front-end developer",
-      "backend developer",
       "software engineer"
     ],
-    "locations": ["remote", "remote hybrid"],
+    "locations": ["remote"],
     "min_salary": 70000,
-    "excluded_keywords": ["senior", "principal", "10+ years"],
+    "excluded_keywords": ["senior principal", "director", "15+ years"],
     "job_boards": {
       "linkedin": true,
       "indeed": false,
-      "glassdoor": true,
-      "monster": false,
-      "ziprecruiter": true
+      "glassdoor": false,
+      "adzuna": true
     },
     "max_results_per_board": 30,
     "scrape_frequency_hours": 24
@@ -42,9 +39,10 @@
           "Job URL",
           "Application Status",
           "Custom Resume URL",
-          "Hiring Manager",
-          "Contact Email",
-          "Date Added"
+          "Date Added",
+          "Job Description",
+          "Source",
+          "Notes"
         ]
       }
     }

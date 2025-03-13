@@ -41,15 +41,28 @@ class AdzunaScraper(BaseScraper):
             
             jobs = []
             for job in data.get("results", []):
-                # Skip jobs with excluded keywords
-                if any(keyword.lower() in job["title"].lower() 
-                      for keyword in self.config["job_search"]["excluded_keywords"]):
-                    continue
-                
-                # Check for remote indicators
-                description = job.get("description", "").lower()
-                title = job.get("title", "").lower()
+                title_lower = job["title"].lower()
+                description_lower = job.get("description", "").lower()
                 location = str(job.get("location", {}).get("display_name", "")).lower()
+                
+                # Keywords to exclude from both title and description
+                exclude_keywords = [
+                    'senior',
+                    'sr.',
+                    'sr ',
+                    'lead',
+                    'principal',
+                    'staff',
+                    'manager',
+                    'director',
+                    'head of',
+                    'chief'
+                ]
+                
+                # Skip if excluded keywords are in title or description
+                if any(keyword in title_lower for keyword in exclude_keywords) or \
+                   any(keyword in description_lower for keyword in exclude_keywords):
+                    continue
                 
                 # Keywords that indicate fully remote work
                 remote_indicators = [
@@ -84,14 +97,14 @@ class AdzunaScraper(BaseScraper):
                 ]
                 
                 # Check if any exclude indicators are present
-                if any(indicator in description for indicator in exclude_indicators):
+                if any(indicator in description_lower for indicator in exclude_indicators):
                     continue
                 
-                # Check if it's explicitly remote (either in title/location or has strong remote indicators in description)
+                # Check if it's explicitly remote
                 is_remote = (
-                    'remote' in title or 
+                    'remote' in title_lower or 
                     'remote' in location or 
-                    any(indicator in description for indicator in remote_indicators)
+                    any(indicator in description_lower for indicator in remote_indicators)
                 )
                 
                 if not is_remote:

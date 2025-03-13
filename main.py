@@ -24,6 +24,7 @@ from src.scrapers import LinkedInScraper
 from src.utils.google_sheets import GoogleSheetsManager
 from src.resume_generator.openai_generator import OpenAIResumeGenerator
 from src.document_creator.docx_generator import DocxResumeGenerator
+from src.scrapers.adzuna_api import AdzunaScraper
 
 # Load environment variables
 load_dotenv()
@@ -37,7 +38,7 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-logger = logging.getLogger('main')
+logger = logging.getLogger('AutomatedJobSearch')
 
 def scrape_jobs(args):
     """Scrape jobs from configured job boards"""
@@ -210,44 +211,151 @@ def setup():
     
     print("\nSetup complete! Edit your config.json file to customize job search parameters.")
 
+def process_job_application(job_data):
+    """Process a single job application"""
+    try:
+        logger.info(f"Processing job application for: {job_data['title']} at {job_data['company']}")
+        
+        # 1. Generate tailored resume content using OpenAI
+        logger.info("Generating tailored resume content...")
+        openai_generator = OpenAIResumeGenerator()
+        
+        # Combine job title, description, and requirements for better context
+        full_job_description = f"""
+        {job_data['title']}
+        
+        Company: {job_data['company']}
+        Location: {job_data['location']}
+        
+        Job Description:
+        {job_data['description']}
+        
+        Requirements:
+        {job_data.get('requirements', 'Not specified')}
+        """
+        
+        tailored_resume = openai_generator.generate_tailored_resume(full_job_description)
+        
+        # Add metadata about the job
+        tailored_resume["metadata"] = {
+            "job_title": job_data["title"],
+            "company": job_data["company"],
+            "job_id": job_data.get("id", "unknown"),
+            "job_url": job_data.get("redirect_url", ""),
+            "application_date": datetime.now().isoformat(),
+            "tailored": True
+        }
+        
+        # 2. Generate Word document
+        logger.info("Generating Word document...")
+        doc_generator = DocxResumeGenerator()
+        doc_path = doc_generator.generate_resume_file(tailored_resume)
+        
+        if not doc_path:
+            raise Exception("Failed to generate resume document")
+        
+        # 3. Upload to Google Drive
+        logger.info("Uploading to Google Drive...")
+        drive_url = doc_generator.upload_to_google_drive(doc_path)
+        
+        if not drive_url:
+            raise Exception("Failed to upload resume to Google Drive")
+        
+        # 4. Update job data with resume information
+        job_data.update({
+            "resume_path": doc_path,
+            "resume_drive_url": drive_url,
+            "application_date": datetime.now().isoformat(),
+            "status": "Resume Generated"
+        })
+        
+        # 5. Add to Google Sheets
+        logger.info("Adding job to Google Sheets...")
+        sheets_manager = GoogleSheetsManager()
+        
+        # Format job data for Google Sheets
+        sheet_data = {
+            "Job Title": job_data["title"],
+            "Company": job_data["company"],
+            "Location": job_data["location"],
+            "Job Type": "Remote",  # Since we're filtering for remote jobs
+            "Salary Range": job_data.get("salary_text", "Not specified"),
+            "Job URL": job_data.get("redirect_url", job_data.get("url", "")),
+            "Application Status": "Resume Generated",
+            "Custom Resume URL": drive_url,
+            "Date Added": datetime.now().strftime("%Y-%m-%d"),
+            "Job Description": job_data.get("description", "")[:1000],  # Truncate if too long
+            "Source": job_data.get("source", "Adzuna"),
+            "Notes": f"Resume generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        }
+        
+        # Add to Google Sheets
+        added_jobs = sheets_manager.add_jobs([sheet_data])
+        
+        if not added_jobs:
+            logger.warning("Failed to add job to Google Sheets")
+        else:
+            logger.info("Successfully added job to Google Sheets")
+            job_data["sheets_status"] = "Added"
+        
+        logger.info(f"Successfully processed job application. Resume URL: {drive_url}")
+        return job_data
+        
+    except Exception as e:
+        logger.error(f"Error processing job application: {str(e)}")
+        raise
+
 def main():
-    """Main entry point for the application"""
-    parser = argparse.ArgumentParser(description="Automated Job Application Workflow")
-    
-    # Main commands
-    parser.add_argument("--setup", action="store_true", help="Run initial setup")
-    parser.add_argument("--scrape", action="store_true", help="Scrape job boards")
-    parser.add_argument("--generate-resumes", action="store_true", help="Generate tailored resumes")
-    parser.add_argument("--full-workflow", action="store_true", help="Run the complete workflow")
-    
-    # Options
-    parser.add_argument("--debug", action="store_true", help="Run in debug mode")
-    parser.add_argument("--show-browser", action="store_true", help="Show browser during scraping")
-    parser.add_argument("--skip-sheets", action="store_true", help="Skip adding jobs to Google Sheets")
-    parser.add_argument("--max-resumes", type=int, help="Maximum number of resumes to generate")
-    
-    args = parser.parse_args()
-    
-    # Default to --help if no arguments provided
-    if not any(vars(args).values()):
-        parser.print_help()
-        return
-    
-    # Run setup if requested
-    if args.setup:
-        setup()
-        return
-    
-    # Run workflow components
-    if args.scrape or args.full_workflow:
-        job_file = scrape_jobs(args)
-        logger.info(f"Job scraping completed. Results in {job_file}")
-    
-    if args.generate_resumes or args.full_workflow:
-        generate_resumes(args)
-        logger.info("Resume generation completed")
-    
-    logger.info("Job application workflow completed")
+    """Main function to run the automated job search process"""
+    try:
+        load_dotenv()
+        
+        # 1. Initialize Adzuna scraper and search for jobs
+        logger.info("Initializing Adzuna scraper...")
+        scraper = AdzunaScraper()
+        
+        # Search for remote Python developer jobs
+        keywords = "python developer remote"
+        location = "remote"
+        
+        logger.info("Searching for jobs...")
+        jobs = scraper.search(keywords, location)
+        
+        if not jobs:
+            logger.warning("No jobs found matching the criteria")
+            return
+        
+        # Process the first job as a test
+        first_job = jobs[0]
+        logger.info(f"Selected job: {first_job['title']} at {first_job['company']}")
+        
+        # Process the job application
+        processed_job = process_job_application(first_job)
+        
+        # Save the processed job data
+        output_dir = "processed_jobs"
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, f"job_{processed_job.get('id', 'unknown')}.json")
+        
+        with open(output_path, 'w') as f:
+            json.dump(processed_job, f, indent=2)
+        
+        logger.info(f"Job processing complete. Results saved to: {output_path}")
+        
+        # Print summary
+        print("\n=== Job Application Summary ===")
+        print(f"Job Title: {processed_job['title']}")
+        print(f"Company: {processed_job['company']}")
+        print(f"Location: {processed_job['location']}")
+        print(f"Job URL: {processed_job.get('redirect_url', processed_job.get('url', 'Not available'))}")
+        print(f"Resume Drive URL: {processed_job['resume_drive_url']}")
+        print(f"Application Date: {processed_job['application_date']}")
+        print(f"Status: {processed_job['status']}")
+        print(f"Google Sheets Status: {processed_job.get('sheets_status', 'Not added')}")
+        
+    except Exception as e:
+        logger.error(f"Error in main process: {str(e)}")
+        raise
 
 if __name__ == "__main__":
     main() 

@@ -3,6 +3,9 @@ import json
 import requests
 from dotenv import load_dotenv
 from src.scrapers.adzuna_api import AdzunaScraper
+from src.utils.google_sheets import GoogleSheetsManager
+import argparse
+from datetime import datetime
 
 def print_job_details(job, index):
     """Helper function to print job details in a consistent format"""
@@ -45,13 +48,63 @@ def test_direct_api():
         # Filter for remote jobs
         remote_jobs = []
         for job in data.get('results', []):
+            # Skip senior roles
+            title_lower = job["title"].lower()
+            if any(keyword.lower() in title_lower 
+                  for keyword in ['senior', 'sr.', 'sr ', 'lead', 'principal', 'staff']):
+                continue
+                
             description = job.get('description', '').lower()
             title = job.get('title', '').lower()
             location = str(job.get('location', {}).get('display_name', '')).lower()
             
-            if ('remote' in description or 'remote' in title or 'remote' in location or
-                'work from home' in description or 'wfh' in description):
-                remote_jobs.append(job)
+            # Keywords that indicate fully remote work
+            remote_indicators = [
+                'fully remote',
+                '100% remote',
+                'remote position',
+                'work from home',
+                'work from anywhere',
+                'remote work',
+                'remote opportunity'
+            ]
+            
+            # Keywords that indicate hybrid or in-office requirements
+            exclude_indicators = [
+                'hybrid',
+                'in office',
+                'in-office',
+                'on site',
+                'on-site',
+                'onsite',
+                'must be in',
+                'must work in',
+                'must live in',
+                'must be located',
+                'must relocate',
+                'required to work',
+                'days per week in',
+                'days in office',
+                'office presence',
+                'office attendance',
+                'come to the office'
+            ]
+            
+            # Skip if any exclude indicators are present
+            if any(indicator in description for indicator in exclude_indicators):
+                continue
+            
+            # Check if it's explicitly remote
+            is_remote = (
+                'remote' in title_lower or 
+                'remote' in location or 
+                any(indicator in description for indicator in remote_indicators)
+            )
+            
+            if not is_remote:
+                continue
+                
+            remote_jobs.append(job)
         
         print(f"\nFound {len(remote_jobs)} remote jobs from direct API")
         print("\nShowing first 5 remote jobs from direct API:")
@@ -61,7 +114,7 @@ def test_direct_api():
     except Exception as e:
         print(f"Error: {str(e)}")
 
-def test_scraper():
+def test_scraper(add_to_sheets=False):
     """Test the AdzunaScraper class"""
     print("\nTesting AdzunaScraper class...")
     print("=" * 50)
@@ -77,14 +130,49 @@ def test_scraper():
         print("\nShowing first 5 remote jobs from scraper:")
         for i, job in enumerate(jobs[:5]):
             print_job_details(job, i)
+
+        if add_to_sheets:
+            print("\nAdding jobs to Google Sheets...")
+            sheets_manager = GoogleSheetsManager()
+            
+            # Format jobs for Google Sheets
+            sheet_jobs = []
+            for job in jobs:
+                sheet_data = {
+                    "Job Title": job["title"],
+                    "Company": job["company"],
+                    "Location": job["location"],
+                    "Job Type": "Remote",
+                    "Salary Range": job.get("salary_text", "Not specified"),
+                    "Job URL": job.get("redirect_url", job.get("url", "")),
+                    "Application Status": "New",
+                    "Custom Resume URL": "",  # Will be filled when resume is generated
+                    "Date Added": datetime.now().strftime("%Y-%m-%d"),
+                    "Job Description": job.get("description", "")[:1000],  # Truncate if too long
+                    "Source": "Adzuna",
+                    "Notes": ""
+                }
+                sheet_jobs.append(sheet_data)
+            
+            added_jobs = sheets_manager.add_jobs(sheet_jobs)
+            print(f"Added {len(added_jobs)} new jobs to Google Sheets")
+            
+        return jobs
             
     except Exception as e:
         print(f"Error: {str(e)}")
+        return []
 
 if __name__ == "__main__":
     load_dotenv()
+    
+    parser = argparse.ArgumentParser(description='Test Adzuna API and Scraper')
+    parser.add_argument('--add-to-sheets', action='store_true', 
+                      help='Add found jobs to Google Sheets')
+    args = parser.parse_args()
+    
     print("Testing Adzuna API Connection for Remote Jobs...")
     print("=" * 50)
     
-    test_direct_api()
-    test_scraper() 
+    api_jobs = test_direct_api()
+    scraper_jobs = test_scraper(add_to_sheets=args.add_to_sheets) 
