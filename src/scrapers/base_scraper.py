@@ -27,6 +27,8 @@ class BaseScraper(ABC):
         
         self.logger = logging.getLogger(self.__class__.__name__)
         self.jobs = []
+        # Add quick test mode flag - easy to remove later
+        self.quick_test = os.getenv('QUICK_TEST', 'true').lower() == 'true'
     
     @abstractmethod
     def login(self):
@@ -94,6 +96,15 @@ class BaseScraper(ABC):
                     self.logger.info(f"Searching for {keyword} in {loc}")
                     jobs = self.search(keyword, loc)
                     self.jobs.extend(jobs)
+                    
+                    # If in quick test mode and we found at least one job, stop searching
+                    if self.quick_test and len(self.jobs) > 0:
+                        self.logger.info("Quick test mode: Found a job, stopping search")
+                        break
+                
+                # If in quick test mode and we found at least one job, stop searching keywords
+                if self.quick_test and len(self.jobs) > 0:
+                    break
             
             self.jobs = self.filter_jobs(self.jobs)
             return self.save_results()

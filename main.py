@@ -8,6 +8,10 @@ This script automates the job application process by:
 3. Customizing resumes using OpenAI
 4. Generating tailored resume documents
 5. Tracking application status and details
+
+Quick Test Mode:
+Set QUICK_TEST=true in your environment to stop after finding 1 job per board (default: true)
+Set QUICK_TEST=false to scrape all jobs up to max_results_per_board
 """
 
 import os
@@ -20,11 +24,11 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 # Import components
-from src.scrapers import LinkedInScraper
+from src.scrapers import AdzunaScraper, ReedScraper
+from src.scrapers.linkedin_scraper import LinkedInScraper
 from src.utils.google_sheets import GoogleSheetsManager
 from src.resume_generator.openai_generator import OpenAIResumeGenerator
 from src.document_creator.docx_generator import DocxResumeGenerator
-from src.scrapers.adzuna_api import AdzunaScraper
 
 # Load environment variables
 load_dotenv()
@@ -60,14 +64,23 @@ def scrape_jobs(args):
             with open(linkedin_jobs, 'r') as f:
                 jobs.extend(json.load(f))
     
-    # Add other job board scrapers here as they're implemented
-    # if job_boards.get("indeed"):
-    #     logger.info("Scraping Indeed jobs...")
-    #     indeed_scraper = IndeedScraper(config=config, headless=not args.show_browser)
-    #     indeed_jobs = indeed_scraper.run()
-    #     if indeed_jobs:
-    #         with open(indeed_jobs, 'r') as f:
-    #             jobs.extend(json.load(f))
+    # Adzuna
+    if job_boards.get("adzuna"):
+        logger.info("Scraping Adzuna jobs...")
+        adzuna_scraper = AdzunaScraper(config=config)
+        adzuna_jobs = adzuna_scraper.run()
+        if adzuna_jobs:
+            with open(adzuna_jobs, 'r') as f:
+                jobs.extend(json.load(f))
+    
+    # Reed
+    if job_boards.get("reed"):
+        logger.info("Scraping Reed jobs...")
+        reed_scraper = ReedScraper(config=config)
+        reed_jobs = reed_scraper.run()
+        if reed_jobs:
+            with open(reed_jobs, 'r') as f:
+                jobs.extend(json.load(f))
     
     logger.info(f"Found {len(jobs)} jobs across all platforms")
     
@@ -374,77 +387,142 @@ def main():
     """Main function to run the automated job search process"""
     try:
         load_dotenv()
+        logger.info("Starting automated job search process...")
         
-        # 1. Initialize Adzuna scraper and search for jobs
-        logger.info("Initializing Adzuna scraper...")
-        scraper = AdzunaScraper()
+        # Load configuration
+        with open('config.json', 'r') as f:
+            config = json.load(f)
         
-        # Search for remote Python developer jobs
-        keywords = "python developer remote"
-        location = "remote"
-        
-        logger.info("Searching for jobs...")
-        jobs = scraper.search(keywords, location)
-        
-        if not jobs:
-            logger.warning("No jobs found matching the criteria")
-            return
-        
-        # Filter out senior roles
-        filtered_jobs = [
-            job for job in jobs 
-            if not any(term.lower() in job['title'].lower() 
-                      for term in ['senior', 'sr.', 'lead', 'principal', 'architect'])
-        ]
-        
-        logger.info(f"Found {len(filtered_jobs)} jobs after filtering senior roles")
-        
-        # Process up to 3 jobs
-        jobs_to_process = filtered_jobs[:3]
-        logger.info(f"Processing {len(jobs_to_process)} jobs")
-        
+        all_jobs = []
         processed_jobs = []
-        for job in jobs_to_process:
+        quick_test = os.getenv('QUICK_TEST', 'true').lower() == 'true'
+        
+        # Initialize scrapers in priority order
+        scrapers = []
+        if config["job_search"]["job_boards"].get("reed"):
+            scrapers.append(("Reed", ReedScraper(config)))
+        if config["job_search"]["job_boards"].get("adzuna"):
+            scrapers.append(("Adzuna", AdzunaScraper(config)))
+        
+        # Process each job board
+        for scraper_name, scraper in scrapers:
             try:
-                logger.info(f"Processing job: {job['title']} at {job['company']}")
-                processed_job = process_job_application(job)
-                processed_jobs.append(processed_job)
+                logger.info(f"Starting {scraper_name} job search...")
+                found_jobs = False
                 
-                # Save the processed job data
-                output_dir = "processed_jobs"
-                os.makedirs(output_dir, exist_ok=True)
-                output_path = os.path.join(output_dir, f"job_{processed_job.get('id', 'unknown')}.json")
-                
-                with open(output_path, 'w') as f:
-                    json.dump(processed_job, f, indent=2)
-                
-                logger.info(f"Job processing complete. Results saved to: {output_path}")
-                
-                # Add a delay between processing jobs to avoid rate limits
-                time.sleep(5)
+                # Search for jobs using each keyword and location combination
+                for keyword in config["job_search"]["keywords"]:
+                    if found_jobs and quick_test:
+                        break
+                        
+                    for location in config["job_search"]["locations"]:
+                        logger.info(f"Searching {scraper_name} for {keyword} in {location}")
+                        jobs = scraper.search(keyword, location)
+                        
+                        if jobs:
+                            logger.info(f"Found {len(jobs)} jobs from {scraper_name} for {keyword} in {location}")
+                            all_jobs.extend(jobs)
+                            found_jobs = True
+                            if quick_test:
+                                break
+                        else:
+                            logger.info(f"No jobs found from {scraper_name} for {keyword} in {location}")
+                        
+                        # Add a small delay between searches
+                        time.sleep(2)
                 
             except Exception as e:
-                logger.error(f"Error processing job {job['title']}: {str(e)}")
+                logger.error(f"Error processing {scraper_name}: {str(e)}")
                 continue
+        
+        if not all_jobs:
+            logger.warning("No jobs found from any source")
+            return
+        
+        # Remove duplicates based on job URL
+        unique_jobs = []
+        seen_urls = set()
+        for job in all_jobs:
+            url = job.get('url') or job.get('redirect_url')
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                unique_jobs.append(job)
+        
+        logger.info(f"Found {len(unique_jobs)} unique jobs across all platforms")
+        
+        # Filter out senior roles and apply other criteria
+        filtered_jobs = [
+            job for job in unique_jobs 
+            if not any(term.lower() in job['title'].lower() 
+                      for term in config["job_search"]["excluded_keywords"])
+        ]
+        
+        logger.info(f"After filtering, {len(filtered_jobs)} jobs remain")
+        
+        # Process jobs in batches
+        batch_size = 3  # Process 3 jobs at a time
+        for i in range(0, len(filtered_jobs), batch_size):
+            batch = filtered_jobs[i:i + batch_size]
+            logger.info(f"Processing batch of {len(batch)} jobs")
+            
+            for job in batch:
+                try:
+                    logger.info(f"Processing job: {job['title']} at {job['company']}")
+                    processed_job = process_job_application(job)
+                    processed_jobs.append(processed_job)
+                    
+                    # Save the processed job data
+                    output_dir = "processed_jobs"
+                    os.makedirs(output_dir, exist_ok=True)
+                    output_path = os.path.join(
+                        output_dir, 
+                        f"job_{processed_job.get('job_id', 'unknown')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                    )
+                    
+                    with open(output_path, 'w') as f:
+                        json.dump(processed_job, f, indent=2)
+                    
+                    logger.info(f"Job processing complete. Results saved to: {output_path}")
+                    
+                    # Add a delay between processing jobs
+                    time.sleep(5)
+                    
+                except Exception as e:
+                    logger.error(f"Error processing job {job['title']}: {str(e)}")
+                    continue
+            
+            # Add a longer delay between batches
+            time.sleep(10)
         
         # Print summary of all processed jobs
         print("\n=== Job Application Summary ===")
+        print(f"Total jobs found: {len(unique_jobs)}")
+        print(f"Jobs after filtering: {len(filtered_jobs)}")
+        print(f"Jobs successfully processed: {len(processed_jobs)}")
+        print("\nProcessed Jobs Details:")
+        
         for job in processed_jobs:
             print(f"\nJob: {job['title']}")
             print(f"Company: {job['company']}")
             print(f"Location: {job['location']}")
+            print(f"Source: {job['source']}")
             print(f"Job URL: {job.get('redirect_url', job.get('url', 'Not available'))}")
-            print(f"Resume Drive URL: {job['resume_drive_url']}")
-            print(f"Application Date: {job['application_date']}")
-            print(f"Status: {job['status']}")
+            print(f"Resume Drive URL: {job.get('resume_drive_url', 'Not generated')}")
+            print(f"Application Date: {job.get('application_date', 'Not processed')}")
+            print(f"Status: {job.get('status', 'Unknown')}")
             print(f"Google Sheets Status: {job.get('sheets_status', 'Not added')}")
             print("-" * 50)
         
-        logger.info(f"Successfully processed {len(processed_jobs)} jobs")
+        logger.info("Job search process completed successfully")
         
     except Exception as e:
         logger.error(f"Error in main process: {str(e)}")
         raise
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Automated Job Search and Application Process')
+    parser.add_argument('--debug', action='store_true', help='Run in debug mode')
+    parser.add_argument('--skip-sheets', action='store_true', help='Skip Google Sheets integration')
+    args = parser.parse_args()
+    
     main() 

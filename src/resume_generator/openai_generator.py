@@ -119,60 +119,97 @@ class OpenAIResumeGenerator:
                     skills_text = ', '.join(skills)
                     skills_by_category.append(f"{category_name}:\n{skills_text}")
             
-            prompt = f"""
-            Job Description:
-            {job_description}
-            
-            My Current Skills Structure:
-            {'\n\n'.join(skills_by_category)}
-            
-            Standalone Skills:
-            {', '.join(standalone_skills)}
-            
-            As an AI assistant specializing in resume optimization:
-            1. IMPORTANT: DO NOT REMOVE ANY EXISTING SKILLS
-            2. Analyze the job description for additional required technical skills that are not in my current skill set
-            3. Add only the missing skills that are explicitly mentioned in the job description
-            4. Place new skills in their appropriate categories, maintaining the existing structure
-            5. Keep Git and Scrum as standalone skills (not in categories)
-            
-            Return the skills in this EXACT format (including newlines):
-            Programming Languages:
-            [skills list]
-            
-            Git
-            
-            Databases:
-            [skills list]
-            
-            Frameworks, libraries, environments:
-            [skills list]
-            
-            Testing Frameworks:
-            [skills list]
-            
-            Software:
-            [skills list]
-            
-            Scrum
-            
-            IMPORTANT: 
-            - Maintain all existing skills in each category
-            - Only add new skills that are explicitly mentioned in the job description
-            - Keep the exact category names and format
-            - Keep Git and Scrum as standalone entries
-            """
+            prompt = f"""You are a resume skills optimizer. Your task is to analyze the job description and optimize the skills section of the resume.
+
+Job Description:
+{job_description}
+
+Current Skills:
+{'\n\n'.join(skills_by_category)}
+
+Standalone Skills:
+{', '.join(standalone_skills)}
+
+Instructions:
+1. Keep all existing skills that are relevant to the job
+2. Add any missing skills from the job description that are relevant
+3. Format the response EXACTLY as shown below, with ONLY the skills section (no explanatory text)
+4. Category titles should be bold (using **), but the skills themselves should be regular text
+5. Start with "Programming Languages" and end with "Scrum"
+
+Example format:
+**Programming Languages**
+Javascript, Typescript, Python, YAML, HTML5, CSS
+
+**Git**
+
+**Databases**
+SQL, Postgres, MySQL
+
+**Frameworks And Libraries**
+React, Next.js, Expo, React Native, Django
+
+**Testing**
+Jest, Mocha, Chai, Maestro
+
+**Software**
+Sheets, Jira, Asana, Trello, Miro, Figma
+
+**Scrum**
+
+Return ONLY the skills section in this exact format, with no additional text or context."""
             
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.7,
+                temperature=0.3,  # Lower temperature for more consistent formatting
                 max_tokens=self.max_tokens
             )
             
             skills = response.choices[0].message.content.strip()
-            logger.info("Generated tailored skills section")
-            return skills
+            
+            # Extract only the skills section
+            if "Programming Languages" in skills and "Scrum" in skills:
+                start_idx = skills.find("Programming Languages")
+                end_idx = skills.find("Scrum") + len("Scrum")
+                skills_section = skills[start_idx:end_idx]
+                
+                # Process the skills section line by line
+                lines = skills_section.split('\n')
+                formatted_lines = []
+                current_category = None
+                
+                for line in lines:
+                    line = line.strip()
+                    if not line:  # Skip empty lines
+                        continue
+                        
+                    # Remove any existing bold formatting
+                    line = line.replace('**', '')
+                    
+                    # If this line doesn't contain commas, it's a category or standalone skill
+                    if ',' not in line:
+                        # Check if it's a standalone skill
+                        if line.lower() in ['git', 'aws', 'scrum', 'microservices architecture']:
+                            if formatted_lines:  # Add spacing before standalone skill
+                                formatted_lines.append('')
+                            formatted_lines.append(line)
+                        else:
+                            # It's a category
+                            if formatted_lines:  # Add spacing before new category
+                                formatted_lines.append('')
+                            formatted_lines.append(line)
+                    else:
+                        # This is a skills line
+                        formatted_lines.append(line)
+                
+                # Remove trailing empty lines
+                while formatted_lines and not formatted_lines[-1]:
+                    formatted_lines.pop()
+                
+                skills_section = '\n'.join(formatted_lines)
+                logger.info("Generated tailored skills section")
+                return skills_section
             
         except Exception as e:
             logger.error(f"Error generating skills section: {str(e)}")

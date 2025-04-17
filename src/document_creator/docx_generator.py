@@ -283,29 +283,28 @@ class DocxResumeGenerator:
         skills_data = resume_data.get("skills", "")
         if isinstance(skills_data, str) and skills_data.strip():
             # Handle structured string format from OpenAI
-            sections = skills_data.split('\n\n')
-            for section in sections:
-                section = section.strip()
-                if section:
-                    if ':' in section:
-                        # Category with skills
-                        category, skills = section.split(':', 1)
-                        category_para = left_cell.add_paragraph()
-                        category_run = category_para.add_run(category.strip())
+            sections = skills_data.split('\n')
+            for line in sections:
+                line = line.strip()
+                if not line:  # Skip empty lines
+                    continue
+                    
+                # If this line doesn't contain commas, it's a category or standalone skill
+                if ',' not in line:
+                    # Add a category or standalone skill
+                    category_para = left_cell.add_paragraph()
+                    category_run = category_para.add_run(line.strip())
+                    # Only make it bold if it's not a standalone skill
+                    if line.strip().lower() not in ['git', 'scrum', 'azure']:
                         category_run.bold = True
-                        category_run.font.size = Pt(10)  # Ensure category is 10pt
-                        
-                        skills_para = left_cell.add_paragraph()
-                        skills_run = skills_para.add_run(skills.strip())
-                        skills_run.font.size = Pt(10)  # Ensure skills are 10pt
-                        skills_para.paragraph_format.space_after = Pt(6)
-                    else:
-                        # Standalone skill (Git or Scrum)
-                        standalone_para = left_cell.add_paragraph()
-                        standalone_run = standalone_para.add_run(section.strip())
-                        standalone_run.bold = True
-                        standalone_run.font.size = Pt(10)  # Ensure standalone skills are 10pt
-                        standalone_para.paragraph_format.space_after = Pt(6)
+                    category_run.font.size = Pt(10)
+                else:
+                    # This is a skills line
+                    skills_para = left_cell.add_paragraph()
+                    skills_run = skills_para.add_run(line.strip())
+                    skills_run.font.size = Pt(10)
+                    skills_para.paragraph_format.space_after = Pt(6)
+                    skills_run.bold = False
         elif isinstance(skills_data, dict):
             # Handle dictionary format from resume_data.json
             # First add categorized skills

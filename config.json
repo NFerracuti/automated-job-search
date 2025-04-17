@@ -34,7 +34,7 @@
       "python full stack developer",
       "django full stack developer"
     ],
-    "locations": ["remote"],
+    "locations": ["remote", "Toronto, Ontario", "Greater Toronto Area"],
     "min_salary": 70000,
     "excluded_keywords": [
       "senior principal",
@@ -48,9 +48,10 @@
       "linkedin": true,
       "indeed": false,
       "glassdoor": false,
-      "adzuna": true
+      "adzuna": true,
+      "reed": true
     },
-    "max_results_per_board": 30,
+    "max_results_per_board": 2,
     "scrape_frequency_hours": 24
   },
   "resume": {

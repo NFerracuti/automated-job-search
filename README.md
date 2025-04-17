@@ -11,6 +11,7 @@ This tool automates the job application process by:
 ## Setup Instructions
 
 1. Clone this repository
+   1a. if necessary, start a virtual environment with `source venv/bin/activate`
 2. Install dependencies: `pip install -r requirements.txt`
 3. Configure environment variables in `.env` file:
    ```
