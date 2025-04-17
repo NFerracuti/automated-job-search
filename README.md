@@ -54,7 +54,28 @@ pip install -r requirements.txt
         }
         ```
 
-4. Set up OpenAI API (you must be an Openai paid subscriber to this):
+4. Set up Job Board APIs:
+
+   a. Reed API:
+
+   1. Go to [Reed Developer Portal](https://www.reed.co.uk/developers)
+   2. Sign in or create an account
+   3. Navigate to "API Keys" section
+   4. Click "Generate new API key"
+   5. Copy the generated API key
+   6. Note: Keep this key secure and never share it publicly
+
+   b. Adzuna API:
+
+   1. Go to [Adzuna API Portal](https://developer.adzuna.com/)
+   2. Sign in or create an account
+   3. Navigate to "My Apps" section
+   4. Click "Create new app"
+   5. Fill in the required details
+   6. Once created, you'll receive an App ID and App Key
+   7. Note: Keep these keys secure and never share them publicly
+
+5. Set up OpenAI API (you must be an Openai paid subscriber to this):
 
    1. Go to [OpenAI Platform](https://platform.openai.com/)
    2. Sign in or create an account
@@ -63,16 +84,16 @@ pip install -r requirements.txt
    5. Copy the generated API key
    6. Note: Keep this key secure and never share it publicly
 
-5. Set up environment variables:
+6. Set up environment variables:
 
    - Copy `.env.example` to `.env`
    - Fill in your API keys and credentials:
-     - `OPENAI_API_KEY`: Your OpenAI API key (from step 4)
-     - `REED_API_KEY`: Your Reed API key
-     - `ADZUNA_API_KEY`: Your Adzuna API key
+     - `OPENAI_API_KEY`: Your OpenAI API key (from step 5)
+     - `REED_API_KEY`: Your Reed API key (from step 4a)
+     - `ADZUNA_API_KEY`: Your Adzuna API key (from step 4b)
      - `GOOGLE_APPLICATION_CREDENTIALS`: Path to your Google service account JSON file (e.g., "./google-services-account.json")
 
-6. Configure the application:
+7. Configure the application:
 
    - Copy `config.example.json` to `config.json`
    - Customize the following sections:
@@ -80,7 +101,7 @@ pip install -r requirements.txt
      - `google_sheets`: Configure your spreadsheet name and structure
      - `resume`: Set your resume template path and Google Drive folder ID
 
-7. Run the application:
+8. Run the application:
 
 ```bash
 python main.py
@@ -127,7 +148,3 @@ The system uses two configuration files:
 3. Commit your changes
 4. Push to the branch
 5. Create a Pull Request
-
-## License
-
-MIT License
