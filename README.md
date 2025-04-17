@@ -15,16 +15,64 @@ cd automated-job-search
 pip install -r requirements.txt
 ```
 
-3. Set up environment variables:
+3. Set up Google Cloud Console:
+
+   1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+   2. Create a new project or select an existing one
+   3. Enable required APIs:
+      - Go to "APIs & Services" > "Library"
+      - Search for and enable:
+        - Google Sheets API
+        - Google Drive API
+   4. Create service account credentials:
+      - Go to "APIs & Services" > "Credentials"
+      - Click "Create Credentials" > "Service Account"
+      - Fill in service account details
+      - Click "Create and Continue"
+      - For Role, select "Editor" (or create custom role with Sheets and Drive permissions)
+      - Click "Done"
+   5. Generate JSON key:
+      - Click on the created service account
+      - Go to "Keys" tab
+      - Click "Add Key" > "Create new key"
+      - Choose JSON format
+      - Click "Create"
+      - Save the downloaded JSON file as `google-services-account.json` in the project root directory
+   6. Share Google Sheet:
+      - Create a new Google Sheet
+      - Click "Share" button
+      - Add the service account email (found in the JSON file)
+      - Give "Editor" access
+      - Get the spreadsheet ID from the URL:
+        - The URL format is: `https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit`
+        - Copy the ID between `/d/` and `/edit`
+      - Add the spreadsheet ID to `config.json`:
+        ```json
+        "google_sheets": {
+            "spreadsheet_id": "YOUR_SPREADSHEET_ID",
+            ...
+        }
+        ```
+
+4. Set up OpenAI API (you must be an Openai paid subscriber to this):
+
+   1. Go to [OpenAI Platform](https://platform.openai.com/)
+   2. Sign in or create an account
+   3. Click on your profile icon > "View API keys"
+   4. Click "Create new secret key"
+   5. Copy the generated API key
+   6. Note: Keep this key secure and never share it publicly
+
+5. Set up environment variables:
 
    - Copy `.env.example` to `.env`
    - Fill in your API keys and credentials:
-     - `OPENAI_API_KEY`: Your OpenAI API key
+     - `OPENAI_API_KEY`: Your OpenAI API key (from step 4)
      - `REED_API_KEY`: Your Reed API key
      - `ADZUNA_API_KEY`: Your Adzuna API key
-     - `GOOGLE_APPLICATION_CREDENTIALS`: Path to your Google service account credentials
+     - `GOOGLE_APPLICATION_CREDENTIALS`: Path to your Google service account JSON file (e.g., "./google-services-account.json")
 
-4. Configure the application:
+6. Configure the application:
 
    - Copy `config.example.json` to `config.json`
    - Customize the following sections:
@@ -32,14 +80,7 @@ pip install -r requirements.txt
      - `google_sheets`: Configure your spreadsheet name and structure
      - `resume`: Set your resume template path and Google Drive folder ID
 
-5. Set up Google Sheets:
-
-   - Create a new Google Sheet
-   - Share it with the service account email from your credentials
-   - Copy the spreadsheet ID from the URL
-   - Update `config.json` with your spreadsheet ID
-
-6. Run the application:
+7. Run the application:
 
 ```bash
 python main.py
