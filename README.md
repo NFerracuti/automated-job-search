@@ -2,20 +2,35 @@
 
 ## Setup Instructions
 
-1. Clone the repository:
+> **Note**: Before proceeding, you may need to set up a Python virtual environment. The commands below assume you're using Python 3.8 or higher. Depending on your system, you might need to use `python3` instead of `python` and `pip3` instead of `pip`.
+
+1. Set up a virtual environment (recommended):
+
+   ```bash
+   # On Windows
+   python -m venv venv
+   .\venv\Scripts\activate
+
+   # On macOS/Linux
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+2. Clone the repository:
 
 ```bash
 git clone https://github.com/yourusername/automated-job-search.git
 cd automated-job-search
 ```
 
-2. Install dependencies:
+3. Install dependencies:
 
 ```bash
+# Make sure your virtual environment is activated
 pip install -r requirements.txt
 ```
 
-3. Set up Google Cloud Console:
+4. Set up Google Cloud Console:
 
    1. Go to [Google Cloud Console](https://console.cloud.google.com/)
    2. Create a new project or select an existing one
@@ -54,7 +69,7 @@ pip install -r requirements.txt
         }
         ```
 
-4. Set up Job Board APIs:
+5. Set up Job Board APIs:
 
    a. Reed API:
 
@@ -75,7 +90,7 @@ pip install -r requirements.txt
    6. Once created, you'll receive an App ID and App Key
    7. Note: Keep these keys secure and never share them publicly
 
-5. Set up OpenAI API (you must be an Openai paid subscriber to this):
+6. Set up OpenAI API (you must be an Openai paid subscriber to this):
 
    1. Go to [OpenAI Platform](https://platform.openai.com/)
    2. Sign in or create an account
@@ -84,16 +99,16 @@ pip install -r requirements.txt
    5. Copy the generated API key
    6. Note: Keep this key secure and never share it publicly
 
-6. Set up environment variables:
+7. Set up environment variables:
 
    - Copy `.env.example` to `.env`
    - Fill in your API keys and credentials:
-     - `OPENAI_API_KEY`: Your OpenAI API key (from step 5)
-     - `REED_API_KEY`: Your Reed API key (from step 4a)
-     - `ADZUNA_API_KEY`: Your Adzuna API key (from step 4b)
+     - `OPENAI_API_KEY`: Your OpenAI API key (from step 6)
+     - `REED_API_KEY`: Your Reed API key (from step 5a)
+     - `ADZUNA_API_KEY`: Your Adzuna API key (from step 5b)
      - `GOOGLE_APPLICATION_CREDENTIALS`: Path to your Google service account JSON file (e.g., "./google-services-account.json")
 
-7. Configure the application:
+8. Configure the application:
 
    - Copy `config.example.json` to `config.json`
    - Customize the following sections:
@@ -101,7 +116,7 @@ pip install -r requirements.txt
      - `google_sheets`: Configure your spreadsheet name and structure
      - `resume`: Set your resume template path and Google Drive folder ID
 
-8. Run the application:
+9. Run the application:
 
 ```bash
 python main.py
