@@ -1,48 +1,92 @@
-# Automated Job Application Workflow
-
-This tool automates the job application process by:
-
-1. Scraping job boards for relevant positions
-2. Storing job listings in Google Sheets
-3. Customizing resumes using OpenAI
-4. Generating tailored resume documents
-5. Tracking application status and details
+# Automated Job Search System
 
 ## Setup Instructions
 
-1. Clone this repository
-   1a. if necessary, start a virtual environment with `source venv/bin/activate`
-2. Install dependencies: `pip install -r requirements.txt`
-3. Configure environment variables in `.env` file:
-   ```
-   OPENAI_API_KEY=your_openai_key
-   GOOGLE_CREDENTIALS_PATH=path_to_google_credentials.json
-   RESUME_TEMPLATE_PATH=path_to_resume_template.docx
-   ```
-4. Run the setup script: `python setup.py`
-5. Start the application: `python main.py`
+1. Clone the repository:
 
-## Components
+```bash
+git clone https://github.com/yourusername/automated-job-search.git
+cd automated-job-search
+```
 
-- `src/scrapers/`: Job board scraping modules
-- `src/resume_generator/`: Resume customization with OpenAI
-- `src/document_creator/`: Document generation tools
-- `src/utils/`: Helper functions and utilities
+2. Install dependencies:
 
-## Usage
+```bash
+pip install -r requirements.txt
+```
 
-The application can be run in several modes:
+3. Set up environment variables:
 
-- Scrape and store jobs: `python main.py --scrape`
-- Generate resumes: `python main.py --generate-resumes`
-- Full workflow: `python main.py --full-workflow`
+   - Copy `.env.example` to `.env`
+   - Fill in your API keys and credentials:
+     - `OPENAI_API_KEY`: Your OpenAI API key
+     - `REED_API_KEY`: Your Reed API key
+     - `ADZUNA_API_KEY`: Your Adzuna API key
+     - `GOOGLE_APPLICATION_CREDENTIALS`: Path to your Google service account credentials
 
-See `python main.py --help` for all options.
+4. Configure the application:
+
+   - Copy `config.example.json` to `config.json`
+   - Customize the following sections:
+     - `job_search`: Set your preferred keywords, locations, and salary requirements
+     - `google_sheets`: Configure your spreadsheet name and structure
+     - `resume`: Set your resume template path and Google Drive folder ID
+
+5. Set up Google Sheets:
+
+   - Create a new Google Sheet
+   - Share it with the service account email from your credentials
+   - Copy the spreadsheet ID from the URL
+   - Update `config.json` with your spreadsheet ID
+
+6. Run the application:
+
+```bash
+python main.py
+```
 
 ## Configuration
 
-Edit `config.json` to customize:
+The system uses two configuration files:
+
+1. `.env`: Contains sensitive information and API keys
+2. `config.json`: Contains application settings and preferences
+
+### Environment Variables (.env)
+
+- API keys for various services
+- Google service account credentials
+- Other sensitive configuration
+
+### Application Config (config.json)
 
 - Job search parameters
-- Resume template settings
-- Application tracking preferences
+- Google Sheets configuration
+- Resume generation settings
+
+## Features
+
+- Automated job search across multiple platforms
+- Customizable job filtering
+- Automated resume generation
+- Google Sheets integration for tracking applications
+- Support for multiple job boards (LinkedIn, Reed, Adzuna)
+
+## Security Notes
+
+- Never commit your `.env` or `config.json` files
+- Keep your API keys secure
+- Use environment variables for sensitive data
+- Regularly rotate your API keys
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+MIT License

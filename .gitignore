@@ -53,4 +53,7 @@ Thumbs.db
 
 # Selenium
 geckodriver.log
-chromedriver.log 
+chromedriver.log
+
+# Configuration files
+config.json 

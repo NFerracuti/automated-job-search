@@ -1,0 +1,37 @@
+{
+  "job_search": {
+    "keywords": ["software engineer", "full stack developer"],
+    "locations": ["London", "Remote"],
+    "min_salary": 50000,
+    "max_results_per_board": 50,
+    "excluded_keywords": ["senior", "lead", "principal"],
+    "job_boards": {
+      "linkedin": true,
+      "reed": true,
+      "adzuna": true
+    }
+  },
+  "google_sheets": {
+    "spreadsheet_name": "Job Application Tracker",
+    "sheets": {
+      "jobs": {
+        "name": "Jobs",
+        "columns": [
+          "Job Title",
+          "Company",
+          "Location",
+          "Job URL",
+          "Date Applied",
+          "Status",
+          "Custom Resume URL",
+          "Notes"
+        ]
+      }
+    }
+  },
+  "resume": {
+    "template_path": "assets/resume_template_example.txt",
+    "output_dir": "generated_resumes",
+    "google_drive_folder_id": "YOUR_GOOGLE_DRIVE_FOLDER_ID"
+  }
+}
